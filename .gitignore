@@ -2,3 +2,5 @@
 diff.txt
 quickdraw_dataset.npz
 *.npz
+app.py
+__pycache__/

@@ -2,7 +2,7 @@ import numpy as np
 import cupy as cp
 
 class nn:
-    def __init__(self, xs, z1s, z2s, ys, learning_rate=0.01, momentum=0.9):
+    def __init__(self, xs, z1s, z2s, ys, learning_rate, momentum=0.95):
         self.xs = xs
         self.z1s = z1s
         self.z2s = z2s
@@ -114,7 +114,7 @@ class nn:
 
 
     # Training and prediction methods
-    def train(self, X, y, epochs, batch_size):
+    def train(self, X, y, epochs, batch_size, decay_every=10, decay_factor=0.5):
         n = X.shape[0]
 
         for epoch in range(epochs): 
@@ -154,6 +154,10 @@ class nn:
                 # Update correct and total counts
                 correct += cp.sum(predictions == labels)
                 total += X_batch.shape[1]
+                
+            if (epoch + 1) % decay_every == 0:
+                self.learning_rate *= decay_factor
+                print(f"Learning rate decayed to {self.learning_rate:.6f}")
 
             # Compute average loss and accuracy for the epoch
             average_loss = float(total_loss / n)
@@ -217,19 +221,19 @@ class nn:
         self.learning_rate = float(data['learning_rate'])
 
 if __name__ == "__main__":
-    model = nn(784, 512, 256, 344, 0.01)
+    model = nn(784, 1024, 512, 344, 0.01)
 
     X, y, classes = model.load_data("quickdraw_dataset.npz")
     model.load_model("quickdraw_model.npz")
 
-    # model.train(X, y, epochs=20, batch_size=256)
-    # model.save_model("quickdraw_model.npz")
+    model.train(X, y, epochs=100, batch_size=512, decay_every=1, decay_factor=0.97)
+    model.save_model("quickdraw_model.npz")
 
-    idx = np.random.choice(len(X), 10, replace=False)
-    prediction = model.predict(X[idx])
+    # idx = np.random.choice(len(X), 10, replace=False)
+    # prediction = model.predict(X[idx])
 
-    predicted_labels = classes[prediction]
-    true_labels = classes[y[idx]]
+    # predicted_labels = classes[prediction]
+    # true_labels = classes[y[idx]]
 
-    for pred, true in zip(predicted_labels, true_labels):
-    	print(f"Predicted: {pred:20s} | Actual: {true}")
+    # for pred, true in zip(predicted_labels, true_labels):
+    # 	print(f"Predicted: {pred:20s} | Actual: {true}")
