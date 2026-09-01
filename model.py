@@ -9,15 +9,15 @@ class nn:
         self.learning_rate = learning_rate
 
         # Input to hidden layer 1
-        self.W1 = cp.random.randn(self.z1s, self.xs) * 0.1
+        self.W1 = cp.random.randn(self.z1s, self.xs) * cp.sqrt(2 / self.xs)
         self.b1 = cp.zeros((self.z1s, 1))
 
         # Hidden layer 1 to hidden layer 2
-        self.W2 = cp.random.randn(self.z2s, self.z1s) * 0.1
+        self.W2 = cp.random.randn(self.z2s, self.z1s) * cp.sqrt(2 / self.z1s)
         self.b2 = cp.zeros((self.z2s, 1))
 
         # Hidden layer 2 to output layer
-        self.W3 = cp.random.randn(self.ys, self.z2s) * 0.1
+        self.W3 = cp.random.randn(self.ys, self.z2s) * cp.sqrt(2 / self.z2s)
         self.b3 = cp.zeros((self.ys, 1))
 
     # Load dataset
@@ -49,7 +49,7 @@ class nn:
 
         return self.y_pred
     def loss(self, y_pred, y_true):
-        pass
+        return -cp.sum(y_true * cp.log(y_pred + 1e-8)) 
     def backprop(self, x, y_true):
         pass
 
