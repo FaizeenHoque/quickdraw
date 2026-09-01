@@ -29,12 +29,10 @@ class nn:
         self.vb3 = cp.zeros_like(self.b3)
 
     # Load dataset
-    def load_data(self, file_path):
-        data = np.load(file_path)
-
-        X = data['X']
-        y = data['y'].astype(np.int32)
-        classes = data['classes']
+    def load_data(self, x_path, y_path, classes_path):
+        X = np.load(x_path, mmap_mode="r")
+        y = np.load(y_path, mmap_mode="r")
+        classes = np.load(classes_path)
 
         return X, y, classes
 
@@ -114,8 +112,9 @@ class nn:
 
 
     # Training and prediction methods
-    def train(self, X, y, epochs, batch_size, decay_every=10, decay_factor=0.5):
-        n = X.shape[0]
+    def train(self, X_train, y_train, X_val, y_val, epochs, batch_size, decay_every=10, decay_factor=0.5):
+        n = X_train.shape[0]
+        num_batches = (n + batch_size - 1) // batch_size  # Ceiling division to get the number of batches
 
         for epoch in range(epochs): 
 
@@ -133,8 +132,8 @@ class nn:
                 batch_indices = indices[start:end]
 
                 # Get the batch data
-                X_batch = cp.asarray(X[batch_indices].T, dtype=cp.float32)
-                y_batch = cp.asarray(y[batch_indices], dtype=cp.int32)
+                X_batch = cp.asarray(X_train[batch_indices].T, dtype=cp.float32)
+                y_batch = cp.asarray(y_train[batch_indices], dtype=cp.int32)
 
                 # Forward pass
                 y_pred = self.forwardpass(X_batch)
@@ -155,6 +154,27 @@ class nn:
                 correct += cp.sum(predictions == labels)
                 total += X_batch.shape[1]
                 
+                batch_num = start // batch_size + 1
+
+                batch_loss = float(loss_value)
+                batch_accuracy = float(cp.mean(predictions == y_batch))
+
+                progress = batch_num / num_batches
+
+                bar_length = 30
+                filled = int(bar_length * progress)
+                bar = "=" * filled + "-" * (bar_length - filled)
+
+                print(
+                    f"\rEpoch {epoch + 1}/{epochs} "
+                    f"Batch {batch_num}/{num_batches} "
+                    f"[{bar}] "
+                    f"Loss: {batch_loss:.4f} "
+                    f"Accuracy: {batch_accuracy * 100:.2f}%",
+                    end="",
+                    flush=True
+                )
+                
             if (epoch + 1) % decay_every == 0:
                 self.learning_rate *= decay_factor
                 print(f"Learning rate decayed to {self.learning_rate:.6f}")
@@ -162,12 +182,16 @@ class nn:
             # Compute average loss and accuracy for the epoch
             average_loss = float(total_loss / n)
             accuracy = float(correct / total)
+            
+            val_loss, val_accuracy = self.evaluate(X_val, y_val, batch_size)
 
             # Print epoch statistics
             print(
                 f"Epoch {epoch + 1}/{epochs} "
                 f"- Loss: {average_loss:.4f} "
                 f"- Accuracy: {accuracy * 100:.2f}%"
+                f"- Val Loss: {val_loss:.4f} "
+                f"- Val Accuracy: {val_accuracy * 100:.2f}%"
             )
 
     def predict(self, X):
@@ -175,6 +199,32 @@ class nn:
         y_pred = self.forwardpass(X)
         predictions = cp.argmax(y_pred, axis=0)
         return cp.asnumpy(predictions)
+    
+    def evaluate(self, X, y, batch_size=512):
+        n = X.shape[0]
+        total_loss = 0
+        correct = 0
+        total = 0
+
+        for start in range(0, n, batch_size):
+            end = min(start + batch_size, n)
+            X_batch = cp.asarray(X[start:end].T, dtype=cp.float32)
+            y_batch = cp.asarray(y[start:end], dtype=cp.int32)
+
+            y_pred = self.forwardpass(X_batch)
+            loss_value = self.loss(y_pred, y_batch)
+            
+            batch_count = X_batch.shape[1]
+
+            total_loss += loss_value * batch_count
+
+            predictions = cp.argmax(y_pred, axis=0)
+        
+            correct += cp.sum(predictions == y_batch).get()
+            total += batch_count
+
+        return total_loss / total, correct / total
+    
 
     # Model saving and loading methods
     def save_model(self, file_path):
@@ -223,12 +273,13 @@ class nn:
 if __name__ == "__main__":
     model = nn(784, 1024, 512, 344, 0.01)
     model.load_model("quickdraw_model.npz")
+    model.learning_rate = 0.005
+    print(f"Loaded architecture: {model.xs} -> {model.z1s} -> {model.z2s} -> {model.ys}")
     
-    X = np.load("quickdraw_X.npy", mmap_mode="r")
-    y = np.load("quickdraw_y.npy", mmap_mode="r")
-    classes = np.load("quickdraw_classes.npy")
-
-    model.train(X, y, epochs=100, batch_size=512, decay_every=1, decay_factor=0.97)
+    X_train, y_train, classes_train = model.load_data("quickdraw_X_train.npy", "quickdraw_y_train.npy", "quickdraw_classes.npy")
+    X_val, y_val, classes_val = model.load_data("quickdraw_X_val.npy", "quickdraw_y_val.npy", "quickdraw_classes.npy")
+    
+    model.train(X_train, y_train, X_val, y_val, epochs=1, batch_size=4096, decay_every=1, decay_factor=0.998)
     model.save_model("quickdraw_model.npz")
 
     # idx = np.random.choice(len(X), 10, replace=False)
