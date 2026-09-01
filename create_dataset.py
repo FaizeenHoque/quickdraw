@@ -1,48 +1,67 @@
 import numpy as np
 import pathlib
-import matplotlib.pyplot as plt
 import time
 
-X = []
-y = []
+DATA_DIR = pathlib.Path("data")
+SAMPLES_PER_CLASS = 20_000
 
-classes = sorted(pathlib.Path("data").glob("*.npy"))
+files = sorted(DATA_DIR.glob("*.npy"))
 
-for label, file in enumerate(classes):
-	print(f"Loading category: {file.stem}...")
+if not files:
+    raise RuntimeError("No .npy files found in data/")
 
-	data = np.load(file)
-	data = data[:10000]  # Limit to 10000 samples per class
+classes = np.array([file.stem for file in files])
 
-	# Normalize pixels from 0-255 to 0-1
-	data = data.astype(np.float32) / 255.0
+num_classes = len(files)
+total_samples = num_classes * SAMPLES_PER_CLASS
 
-	X.append(data)
-	y.extend([label] * len(data))
+print("Classes:", num_classes)
+print("Total samples:", total_samples)
 
-# turn lists into numpy arrays
-t0 = time.time()
-X = np.concatenate(X, axis=0)
-y = np.array(y)
-print(f"Concatenate took {time.time() - t0:.1f}s")
+print("Creating disk-backed arrays...")
 
-# shuffle X and y together (same permutation) so the saved file
-# isn't grouped by class, useful if training later reads sequential slices
-t0 = time.time()
-shuffle_order = np.random.permutation(len(X))
-X = X[shuffle_order]
-y = y[shuffle_order]
-print(f"Shuffle took {time.time() - t0:.1f}s")
-
-print("X shape:", X.shape)
-print("y shape:", y.shape)
-print("Number of classes:", len(classes))
-
-t0 = time.time()
-np.savez(
-	"quickdraw_dataset.npz",
-	X=X,
-	y=y,
-	classes=np.array([file.stem for file in classes])
+X = np.lib.format.open_memmap(
+    "quickdraw_X.npy", mode="w+", dtype=np.float32, shape=(total_samples, 784)
 )
-print(f"Save took {time.time() - t0:.1f}s")
+
+y = np.lib.format.open_memmap(
+    "quickdraw_y.npy", mode="w+", dtype=np.int32, shape=(total_samples,)
+)
+
+offset = 0
+
+for label, file in enumerate(files):
+
+    print(f"[{label + 1}/{num_classes}] " f"Loading {file.stem}...")
+
+    # mmap the source too
+    data = np.load(file, mmap_mode="r")
+    count = min(SAMPLES_PER_CLASS, len(data))
+
+    # Only this class's samples are processed
+    chunk = np.asarray(data[:count], dtype=np.float32)
+    chunk /= 255.0
+
+    X[offset : offset + count] = chunk
+    y[offset : offset + count] = label
+
+    offset += count
+
+    del chunk
+    del data
+
+print("Flushing to disk...")
+
+X.flush()
+y.flush()
+
+del X
+del y
+
+np.save("quickdraw_classes.npy", classes)
+
+print()
+print("Done!")
+print("X:", "quickdraw_X.npy")
+print("y:", "quickdraw_y.npy")
+print("classes:", "quickdraw_classes.npy")

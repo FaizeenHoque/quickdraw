@@ -222,9 +222,11 @@ class nn:
 
 if __name__ == "__main__":
     model = nn(784, 1024, 512, 344, 0.01)
-
-    X, y, classes = model.load_data("quickdraw_dataset.npz")
     model.load_model("quickdraw_model.npz")
+    
+    X = np.load("quickdraw_X.npy", mmap_mode="r")
+    y = np.load("quickdraw_y.npy", mmap_mode="r")
+    classes = np.load("quickdraw_classes.npy")
 
     model.train(X, y, epochs=100, batch_size=512, decay_every=1, decay_factor=0.97)
     model.save_model("quickdraw_model.npz")

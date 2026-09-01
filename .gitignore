@@ -4,3 +4,4 @@ quickdraw_dataset.npz
 *.npz
 app.py
 __pycache__/
+*.npy
