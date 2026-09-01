@@ -220,7 +220,16 @@ if __name__ == "__main__":
     model = nn(784, 512, 256, 344, 0.01)
 
     X, y, classes = model.load_data("quickdraw_dataset.npz")
-    # model.load_model("quickdraw_model.npz")
+    model.load_model("quickdraw_model.npz")
 
-    model.train(X, y, epochs=20, batch_size=256)
-    model.save_model("quickdraw_model.npz")
+    # model.train(X, y, epochs=20, batch_size=256)
+    # model.save_model("quickdraw_model.npz")
+
+    idx = np.random.choice(len(X), 10, replace=False)
+    prediction = model.predict(X[idx])
+
+    predicted_labels = classes[prediction]
+    true_labels = classes[y[idx]]
+
+    for pred, true in zip(predicted_labels, true_labels):
+    	print(f"Predicted: {pred:20s} | Actual: {true}")
