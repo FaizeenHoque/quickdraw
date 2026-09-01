@@ -25,7 +25,7 @@ class nn:
     def load_data(self, file_path):
         data = np.load(file_path)
 
-        X = data['X'].astype(np.float32)
+        X = data['X'].astype(np.float32) / 255.0
         y = data['y'].astype(np.int32)
         classes = data['classes']
 
@@ -147,7 +147,10 @@ class nn:
             )
 
     def predict(self, X):
-        pass
+        X = cp.asarray(X, dtype=cp.float32).T
+        y_pred = self.forwardpass(X)
+        predictions = cp.argmax(y_pred, axis=0)
+        return cp.asnumpy(predictions)
 
     # Model saving and loading methods
     def save_model(self, file_path):
