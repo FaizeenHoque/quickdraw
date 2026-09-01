@@ -1,3 +1,4 @@
+import numpy as np
 import cupy as cp
 
 class nn:
@@ -22,7 +23,13 @@ class nn:
 
     # Load dataset
     def load_data(self, file_path):
-        pass
+        data = np.load(file_path)
+
+        X = data['X'].astype(np.float32)
+        y = data['y'].astype(np.int32)
+        classes = data['classes']
+
+        return X, y, classes
 
     # Activation functions
     def relu(self, z):
@@ -87,8 +94,58 @@ class nn:
 
 
     # Training and prediction methods
-    def train(self, X, y, epochs):
-        pass
+    def train(self, X, y, epochs, batch_size):
+        n = X.shape[0]
+
+        for epoch in range(epochs): 
+
+            # Shuffle the data indices for each epoch
+            indices = np.random.permutation(n)
+
+            total_loss = 0
+            correct = 0
+            total = 0
+
+            for start in range(0, n, batch_size):
+
+                # Get the batch indices
+                end = min(start + batch_size, n)
+                batch_indices = indices[start:end]
+
+                # Get the batch data
+                X_batch = cp.asarray(X[batch_indices].T)
+                y_batch = cp.eye(self.ys, dtype=cp.float32)[y[batch_indices]].T
+
+                # Forward pass
+                y_pred = self.forwardpass(X_batch)
+
+                # Compute loss
+                loss_value = self.loss(y_pred, y_batch)
+
+                total_loss += loss_value * X_batch.shape[1]
+
+                # Backpropagation
+                self.backprop(X_batch, y_batch)
+
+                # Compute accuracy
+                predictions = cp.argmax(y_pred, axis=0)
+                labels = cp.argmax(y_batch, axis=0)
+
+                # Update correct and total counts
+                correct += cp.sum(predictions == labels)
+                total += X_batch.shape[1]
+
+            # Compute average loss and accuracy for the epoch
+            average_loss = float(total_loss / n)
+            accuracy = float(correct / total)
+
+            # Print epoch statistics
+            print(
+                f"Epoch {epoch + 1}/{epochs} "
+                f"- Loss: {average_loss:.4f} "
+                f"- Accuracy: {accuracy * 100:.2f}%"
+            )
+
     def predict(self, X):
         pass
 
