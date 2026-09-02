@@ -1,63 +1,42 @@
-import numpy as np
-import cupy as cp
+from torch import nn
 
-class nn:
-    def __init__(self, xs, z1s, z2s, ys, learning_rate):
-        # First convolutional layer parameters
-        self.conv1_w = cp.random.randn(8, 1, 3, 3) * cp.sqrt(2/9)
-        self.conv1_b = cp.zeros(8)
+class Model(nn.Module):
+    def __init__(self):
+        super(Model, self).__init__()
         
-        # Second convolutional layer parameters
-        self.conv2_w = cp.random.randn(16, 8, 3, 3) * cp.sqrt(2/72)
-        self.conv2_b = cp.zeros(16)
-        
-        # Fully connected layer parameters
-        self.fc1_w = cp.random.randn(128, 784) * cp.sqrt(2/784)
-        self.fc1_b = cp.zeros(128)
-        
-        self.fc2_w = cp.random.randn(344, 128) * cp.sqrt(2/128)
-        self.fc2_b = cp.zeros(344)
-        
-        self.learning_rate = learning_rate
-        
+        self.conv1 = nn.Conv2d(
+            in_channels=1,
+            out_channels=8,
+            kernel_size=3,
+            padding=1
+        )
+        self.conv2 = nn.Conv2d(
+            in_channels=8,
+            out_channels=16,
+            kernel_size=3,
+            padding=1
+        )
+        self.pool = nn.MaxPool2d(
+            kernel_size=2, 
+            stride=2
+        )
+        self.fc1 = nn.Linear(
+            in_features=16 * 7 * 7,
+            out_features=128
+        )
+        self.fc2 = nn.Linear(
+            in_features=128,
+            out_features=344
+        )
     
-    # Load dataset
-    def load_data(self, x_path, y_path, classes_path):
-        ...
-
-    # Activation functions
-    def relu(self, z):
-        return cp.maximum(0, z)
-    def relu_derivative(self, z):
-        return (z > 0).astype(cp.float32)
-    def softmax(self, z):
-        exp = cp.exp(z - cp.max(z))
-        return exp / cp.sum(exp)
-
-    # forward pass, loss calculation and backpropagation
-    def forwardpass(self, x):
-        ...
-    def loss(self, y_pred, y_true):
-        ...
-    def backprop(self, x, y_true):
-        ...
-
-    # Training and prediction methods
-    def train(self, X_train, y_train, X_val, y_val, epochs, batch_size):
-        ...
+    def forward(self, x):
+        x = self.conv1(x)
+        x = nn.functional.relu(x)
+        x = self.pool(x)
         
-    def predict(self, X):
-        ...
-    
-    def evaluate(self, X, y, batch_size=512):
-        ...
-    
-
-    # Model saving and loading methods
-    def save_model(self, file_path):
-        ...
-    def load_model(self, file_path):
-        ...
-
-if __name__ == "__main__":
-    ...
+        x = self.conv2(x)
+        x = nn.functional.relu(x)
+        x = self.pool(x)
+        
+        
+        
