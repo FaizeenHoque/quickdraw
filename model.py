@@ -38,5 +38,11 @@ class Model(nn.Module):
         x = nn.functional.relu(x)
         x = self.pool(x)
         
+        x = x.view(x.size(0), -1)  # Flatten the tensor for the fully connected layer
+        x = nn.functional.relu(self.fc1(x))
+        x = self.fc2(x)
+        
+        return x
+        
         
         
