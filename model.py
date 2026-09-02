@@ -27,6 +27,7 @@ class nn:
         self.b3 = cp.zeros((self.ys, 1))
         self.vW3 = cp.zeros_like(self.W3)
         self.vb3 = cp.zeros_like(self.b3)
+    
 
     # Load dataset
     def load_data(self, x_path, y_path, classes_path):
@@ -95,97 +96,90 @@ class nn:
         db1 = cp.sum(dz1, axis=1, keepdims=True)
 
         # Update weights and biases
-        self.vW3 = self.momentum * self.vW3 + dW3
-        self.vb3 = self.momentum * self.vb3 + db3
+        self.vW3 = self.momentum * self.vW3 + (1 - self.momentum) * dW3
+        self.vb3 = self.momentum * self.vb3 + (1 - self.momentum) * db3
         self.W3 -= self.learning_rate * self.vW3
         self.b3 -= self.learning_rate * self.vb3
 
-        self.vW2 = self.momentum * self.vW2 + dW2
-        self.vb2 = self.momentum * self.vb2 + db2
+        self.vW2 = self.momentum * self.vW2 + (1 - self.momentum) * dW2
+        self.vb2 = self.momentum * self.vb2 + (1 - self.momentum) * db2
         self.W2 -= self.learning_rate * self.vW2
         self.b2 -= self.learning_rate * self.vb2
 
-        self.vW1 = self.momentum * self.vW1 + dW1
-        self.vb1 = self.momentum * self.vb1 + db1
+        self.vW1 = self.momentum * self.vW1 + (1 - self.momentum) * dW1
+        self.vb1 = self.momentum * self.vb1 + (1 - self.momentum) * db1
         self.W1 -= self.learning_rate * self.vW1
         self.b1 -= self.learning_rate * self.vb1
 
-
     # Training and prediction methods
-    def train(self, X_train, y_train, X_val, y_val, epochs, batch_size, decay_every=10, decay_factor=0.5):
+    def train(self, X_train, y_train, X_val, y_val, epochs, batch_size, chunk_size=200_000, decay_every=10, decay_factor=0.5, checkpoint_every=10, checkpoint_path="quickdraw_checkpoint"):
         n = X_train.shape[0]
-        num_batches = (n + batch_size - 1) // batch_size  # Ceiling division to get the number of batches
+        num_batches = (n + batch_size - 1) // batch_size
 
-        for epoch in range(epochs): 
-
-            # Shuffle the data indices for each epoch
-            indices = np.random.permutation(n)
+        for epoch in range(epochs):
+            chunk_starts = list(range(0, n, chunk_size))
+            np.random.shuffle(chunk_starts)
 
             total_loss = 0
             correct = 0
             total = 0
+            batch_num = 0
 
-            for start in range(0, n, batch_size):
+            for chunk_start in chunk_starts:
+                chunk_end = min(chunk_start + chunk_size, n)
 
-                # Get the batch indices
-                end = min(start + batch_size, n)
-                batch_indices = indices[start:end]
+                X_chunk = np.asarray(X_train[chunk_start:chunk_end])
+                y_chunk = np.asarray(y_train[chunk_start:chunk_end])
 
-                # Get the batch data
-                X_batch = cp.asarray(X_train[batch_indices].T, dtype=cp.float32)
-                y_batch = cp.asarray(y_train[batch_indices], dtype=cp.int32)
+                chunk_perm = np.random.permutation(len(X_chunk))
+                X_chunk = X_chunk[chunk_perm]
+                y_chunk = y_chunk[chunk_perm]
 
-                # Forward pass
-                y_pred = self.forwardpass(X_batch)
+                for start in range(0, len(X_chunk), batch_size):
+                    end = min(start + batch_size, len(X_chunk))
 
-                # Compute loss
-                loss_value = self.loss(y_pred, y_batch)
+                    X_batch = cp.asarray(X_chunk[start:end].T, dtype=cp.float32)
+                    y_batch = cp.asarray(y_chunk[start:end], dtype=cp.int32)
 
-                total_loss += loss_value * X_batch.shape[1]
+                    y_pred = self.forwardpass(X_batch)
+                    loss_value = self.loss(y_pred, y_batch)
+                    total_loss += loss_value * X_batch.shape[1]
 
-                # Backpropagation
-                self.backprop(X_batch, y_batch)
+                    self.backprop(X_batch, y_batch)
 
-                # Compute accuracy
-                predictions = cp.argmax(y_pred, axis=0)
-                labels = y_batch
+                    predictions = cp.argmax(y_pred, axis=0)
+                    correct += cp.sum(predictions == y_batch)
+                    total += X_batch.shape[1]
+                    batch_num += 1
 
-                # Update correct and total counts
-                correct += cp.sum(predictions == labels)
-                total += X_batch.shape[1]
-                
-                batch_num = start // batch_size + 1
+                    batch_loss = float(loss_value)
+                    batch_accuracy = float(cp.mean(predictions == y_batch))
+                    progress = batch_num / num_batches
 
-                batch_loss = float(loss_value)
-                batch_accuracy = float(cp.mean(predictions == y_batch))
+                    bar_length = 30
+                    filled = int(bar_length * progress)
+                    bar = "=" * filled + "-" * (bar_length - filled)
 
-                progress = batch_num / num_batches
+                    print(
+                        f"\rEpoch {epoch + 1}/{epochs} "
+                        f"Batch {batch_num}/{num_batches} "
+                        f"[{bar}] "
+                        f"Loss: {batch_loss:.4f} "
+                        f"Accuracy: {batch_accuracy * 100:.2f}%",
+                        end="",
+                        flush=True
+                    )
 
-                bar_length = 30
-                filled = int(bar_length * progress)
-                bar = "=" * filled + "-" * (bar_length - filled)
+            print()
 
-                print(
-                    f"\rEpoch {epoch + 1}/{epochs} "
-                    f"Batch {batch_num}/{num_batches} "
-                    f"[{bar}] "
-                    f"Loss: {batch_loss:.4f} "
-                    f"Accuracy: {batch_accuracy * 100:.2f}%",
-                    end="",
-                    flush=True
-                )
-                
             if (epoch + 1) % decay_every == 0:
                 self.learning_rate *= decay_factor
                 print(f"Learning rate decayed to {self.learning_rate:.6f}")
 
-            # Compute average loss and accuracy for the epoch
             average_loss = float(total_loss / n)
             accuracy = float(correct / total)
-            
             val_loss, val_accuracy = self.evaluate(X_val, y_val, batch_size)
 
-            # Print epoch statistics
             print(
                 f"Epoch {epoch + 1}/{epochs} "
                 f"- Loss: {average_loss:.4f} "
@@ -193,7 +187,12 @@ class nn:
                 f"- Val Loss: {val_loss:.4f} "
                 f"- Val Accuracy: {val_accuracy * 100:.2f}%"
             )
-
+            
+            if (epoch + 1) % checkpoint_every == 0:
+                path = f"{checkpoint_path}_epoch{epoch + 1}.npz"
+                self.save_model(path)
+                print(f"Checkpoint saved: {path}")
+        
     def predict(self, X):
         X = cp.asarray(X, dtype=cp.float32).T
         y_pred = self.forwardpass(X)
@@ -271,15 +270,32 @@ class nn:
         self.learning_rate = float(data['learning_rate'])
 
 if __name__ == "__main__":
-    model = nn(784, 1024, 512, 344, 0.01)
-    model.load_model("quickdraw_model.npz")
-    model.learning_rate = 0.005
-    print(f"Loaded architecture: {model.xs} -> {model.z1s} -> {model.z2s} -> {model.ys}")
+    
+    model = nn(784, 1024, 512, 344, 0.02)
+    # model.load_model("quickdraw_model.npz")
+    # model.learning_rate = 0.005
+    # print(f"Loaded architecture: {model.xs} -> {model.z1s} -> {model.z2s} -> {model.ys}")
     
     X_train, y_train, classes_train = model.load_data("quickdraw_X_train.npy", "quickdraw_y_train.npy", "quickdraw_classes.npy")
     X_val, y_val, classes_val = model.load_data("quickdraw_X_val.npy", "quickdraw_y_val.npy", "quickdraw_classes.npy")
+
+    model.train(X_train, y_train, X_val, y_val, epochs=100, batch_size=1024, decay_every=10, decay_factor=0.7, checkpoint_every=10)
     
-    model.train(X_train, y_train, X_val, y_val, epochs=1, batch_size=4096, decay_every=1, decay_factor=0.998)
+    all_preds = []
+    for start in range(0, X_val.shape[0], 2048):
+        end = min(start + 2048, X_val.shape[0])
+        xb = cp.asarray(X_val[start:end].T, dtype=cp.float32)
+        pred = model.forwardpass(xb)
+        all_preds.append(cp.asnumpy(cp.argmax(pred, axis=0)))
+
+    all_preds = np.concatenate(all_preds)
+    unique, counts = np.unique(all_preds, return_counts=True)
+    print("number of distinct classes predicted:", len(unique))
+    print("top 10 most-predicted classes:", unique[np.argsort(-counts)[:10]], "with counts:", np.sort(counts)[::-1][:10])
+
+    for name, param in [("W1", model.W1), ("W2", model.W2), ("W3", model.W3)]:
+        print(name, "max:", float(cp.max(cp.abs(param))), "has nan:", bool(cp.any(cp.isnan(param))))
+
     model.save_model("quickdraw_model.npz")
 
     # idx = np.random.choice(len(X), 10, replace=False)

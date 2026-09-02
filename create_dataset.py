@@ -3,7 +3,7 @@ import pathlib
 
 DATA_DIR = pathlib.Path("data")
 
-SAMPLES_PER_CLASS = 20_000
+SAMPLES_PER_CLASS = 7_500
 TRAIN_RATIO = 0.9
 
 files = sorted(DATA_DIR.glob("*.npy"))
