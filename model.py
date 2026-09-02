@@ -13,10 +13,10 @@ class QuickDrawDataset(Dataset):
         return len(self.X)
 
     def __getitem__(self, idx):
-        x = torch.tesnor(
+        x = torch.tensor(
             self.X[idx],
             dtype=torch.float32
-        ).respape(1, 28, 28)  
+        ).reshape(1, 28, 28)  
         
         y = torch.tensor(
             self.y[idx],
