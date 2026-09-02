@@ -3,7 +3,7 @@ import pathlib
 
 DATA_DIR = pathlib.Path("data")
 
-SAMPLES_PER_CLASS = 7_500
+SAMPLES_PER_CLASS = 12_000
 TRAIN_RATIO = 0.9
 
 files = sorted(DATA_DIR.glob("*.npy"))
@@ -29,21 +29,22 @@ print("Total samples:", total_train + total_val)
 
 print()
 print("Creating disk-backed arrays...")
+pathlib.Path("dataset").mkdir(exist_ok=True)
 
 X_train = np.lib.format.open_memmap(
-    "quickdraw_X_train.npy", mode="w+", dtype=np.float32, shape=(total_train, 784)
+    "dataset/quickdraw_X_train.npy", mode="w+", dtype=np.float32, shape=(total_train, 784)
 )
 
 y_train = np.lib.format.open_memmap(
-    "quickdraw_y_train.npy", mode="w+", dtype=np.int32, shape=(total_train,)
+    "dataset/quickdraw_y_train.npy", mode="w+", dtype=np.int32, shape=(total_train,)
 )
 
 X_val = np.lib.format.open_memmap(
-    "quickdraw_X_val.npy", mode="w+", dtype=np.float32, shape=(total_val, 784)
+    "dataset/quickdraw_X_val.npy", mode="w+", dtype=np.float32, shape=(total_val, 784)
 )
 
 y_val = np.lib.format.open_memmap(
-    "quickdraw_y_val.npy", mode="w+", dtype=np.int32, shape=(total_val,)
+    "dataset/quickdraw_y_val.npy", mode="w+", dtype=np.int32, shape=(total_val,)
 )
 
 train_offset = 0
@@ -113,7 +114,7 @@ del y_train
 del X_val
 del y_val
 
-np.save("quickdraw_classes.npy", classes)
+np.save("dataset/quickdraw_classes.npy", classes)
 
 print()
 print("Done!")

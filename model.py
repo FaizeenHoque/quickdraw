@@ -5,24 +5,34 @@ from torch import nn
 from torch.utils.data import Dataset, DataLoader
 
 class QuickDrawDataset(Dataset):
-    def __init__(self, X, y):
-        self.X = X
-        self.y = y
+    def __init__(self, X_path, y_path):
+        self.X_path = X_path
+        self.y_path = y_path
+        self.X = None
+        self.y = None
+
+    def _lazy_init(self):
+        if self.X is None:
+            self.X = np.load(self.X_path, mmap_mode="r")
+            self.y = np.load(self.y_path, mmap_mode="r")
 
     def __len__(self):
+        self._lazy_init()
         return len(self.X)
 
     def __getitem__(self, idx):
-        x = torch.tensor(
-            self.X[idx],
-            dtype=torch.float32
-        ).reshape(1, 28, 28)  
-        
-        y = torch.tensor(
-            self.y[idx],
-            dtype=torch.long
-        )
-        return x, y
+        self._lazy_init()
+        return self.X[idx], self.y[idx]
+
+def collate_fn(batch):
+    X, y = zip(*batch)
+
+    X = torch.from_numpy(np.asarray(X)).float()
+    y = torch.from_numpy(np.asarray(y)).long()
+
+    X = X.reshape(-1, 1, 28, 28)
+
+    return X, y
 
 class Model(nn.Module):
     def __init__(self):
@@ -70,30 +80,41 @@ class Model(nn.Module):
         
         
 if __name__ == "__main__":
-    X_train = np.load("quickdraw_X_train.npy", mmap_mode="r")
-    y_train = np.load("quickdraw_y_train.npy", mmap_mode="r")
+    import torch.multiprocessing as mp
+    mp.set_start_method("fork", force=True)
 
-    X_val = np.load("quickdraw_X_val.npy", mmap_mode="r")
-    y_val = np.load("quickdraw_y_val.npy", mmap_mode="r")
+    train_dataset = QuickDrawDataset("quickdraw_X_train.npy", "quickdraw_y_train.npy")
+    val_dataset = QuickDrawDataset("quickdraw_X_val.npy", "quickdraw_y_val.npy")
     
-    train_dataset = QuickDrawDataset(X_train, y_train)
-    val_dataset = QuickDrawDataset(X_val, y_val)
-    
-    train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True, num_workers=0, pin_memory=True)
-    val_loader = DataLoader(val_dataset, batch_size=128, shuffle=False, num_workers=0, pin_memory=True)
+    train_loader = DataLoader(train_dataset, batch_size=1024, shuffle=True, num_workers=4, pin_memory=True, collate_fn=collate_fn)
+    val_loader = DataLoader(val_dataset, batch_size=1024, shuffle=False, num_workers=4, pin_memory=True, collate_fn=collate_fn)
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print (f"Using device: {device}")
     
     model = Model().to(device)
     
+    
+    model.load_state_dict(
+        torch.load(
+            "quickdraw_model.pth",
+            map_location=device
+        )
+    )
+
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.00005)
+    scheduler = torch.optim.lr_scheduler.StepLR(
+        optimizer,
+        step_size=10,
+        gamma=0.5
+    )
     
     model.train()
     print("Starting training...")
     
-    for epoch in range(10):
+    best_val_accuracy = 0.0
+    for epoch in range(100):
         model.train()
         
         total_loss = 0
@@ -101,7 +122,7 @@ if __name__ == "__main__":
         total = 0
 
         for batch_idx, (X, y) in enumerate(train_loader):
-            X, y = X.to(device), y.to(device)
+            X, y = X.to(device, non_blocking=True), y.to(device, non_blocking=True)
             
             optimizer.zero_grad()
             outputs = model(X)
@@ -131,7 +152,7 @@ if __name__ == "__main__":
         epoch_accuracy = correct / total * 100
         
         print(
-            f"Epoch {epoch + 1}/10 "
+            f"Epoch {epoch + 1}/100 "
             f"Loss: {epoch_loss:.4f} "
             f"Accuracy: {epoch_accuracy:.2f}%"
         )
@@ -152,6 +173,21 @@ if __name__ == "__main__":
         val_accuracy = val_correct / val_total * 100
         print(f"Validation Accuracy: {val_accuracy:.2f}%")
         
+        if val_accuracy > best_val_accuracy:
+            best_val_accuracy = val_accuracy
+
+            torch.save(
+                model.state_dict(),
+                "quickdraw_model.pth"
+            )
+
+            print(f"New best model saved! ({val_accuracy:.2f}%)")
+    
+        scheduler.step()
+        
+        print(f"Learning rate: {scheduler.get_last_lr()[0]:.6f}")
+            
+    
         
             
         
