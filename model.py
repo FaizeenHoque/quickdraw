@@ -70,9 +70,22 @@ class Model(nn.Module):
         
         
 if __name__ == "__main__":
-    X_train = np.load("quickdraw_X_train.npy")        
-    y_train = np.load("quickdraw_y_train.npy")
+    X_train = np.load("quickdraw_X_train.npy", mmap_mode="r")
+    y_train = np.load("quickdraw_y_train.npy", mmap_mode="r")
+
+    X_val = np.load("quickdraw_X_val.npy", mmap_mode="r")
+    y_val = np.load("quickdraw_y_val.npy", mmap_mode="r")
     
-    X_val = np.load("quickdraw_X_val.npy")
-    y_val = np.load("quickdraw_y_val.npy")
+    train_dataset = QuickDrawDataset(X_train, y_train)
+    val_dataset = QuickDrawDataset(X_val, y_val)
+    
+    train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True, num_workers=4, pin_memory=True)
+    val_loader = DataLoader(val_dataset, batch_size=128, shuffle=False, num_workers=4, pin_memory=True)
+    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print (f"Using device: {device}")
+    
+    model = Model().to(device)
+    
+    
 
