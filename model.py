@@ -272,14 +272,14 @@ class nn:
 if __name__ == "__main__":
     
     model = nn(784, 1024, 512, 344, 0.02)
-    # model.load_model("quickdraw_model.npz")
-    # model.learning_rate = 0.005
+    model.load_model("quickdraw_checkpoint_epoch100.npz")
+    # model.learning_rate =  0.000565
     # print(f"Loaded architecture: {model.xs} -> {model.z1s} -> {model.z2s} -> {model.ys}")
     
     X_train, y_train, classes_train = model.load_data("quickdraw_X_train.npy", "quickdraw_y_train.npy", "quickdraw_classes.npy")
     X_val, y_val, classes_val = model.load_data("quickdraw_X_val.npy", "quickdraw_y_val.npy", "quickdraw_classes.npy")
 
-    model.train(X_train, y_train, X_val, y_val, epochs=100, batch_size=1024, decay_every=10, decay_factor=0.7, checkpoint_every=10)
+    model.train(X_train, y_train, X_val, y_val, epochs=100, batch_size=1024, decay_every=10, decay_factor=0.7, checkpoint_every=10, checkpoint_path="quickdrawV2_checkpoint")
     
     all_preds = []
     for start in range(0, X_val.shape[0], 2048):
