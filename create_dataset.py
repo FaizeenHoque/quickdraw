@@ -7,9 +7,10 @@ SAMPLES_PER_CLASS = 7_500
 TRAIN_RATIO = 0.9
 
 files = sorted(DATA_DIR.glob("*.npy"))
-
 if not files:
     raise RuntimeError("No .npy files found in data/")
+if len(files) != 344:
+    raise RuntimeError(f"Expected 344 classes, found {len(files)}")
 
 classes = np.array([file.stem for file in files])
 
@@ -58,10 +59,16 @@ for label, file in enumerate(files):
     data = np.load(file, mmap_mode="r")
 
     count = min(SAMPLES_PER_CLASS, len(data))
+    
+    if count < SAMPLES_PER_CLASS:
+        raise RuntimeError(
+            f"{file.stem} has only {len(data)} samples, "
+            f"expected at least {SAMPLES_PER_CLASS}"
+        )
 
     # Randomize this class before splitting
     indices = rng.permutation(count)
-
+    
     train_indices = indices[:train_per_class]
     val_indices = indices[train_per_class:]
 
