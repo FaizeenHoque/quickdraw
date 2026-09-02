@@ -1,4 +1,28 @@
+import numpy as np
+import torch
+
 from torch import nn
+from torch.utils.data import Dataset, DataLoader
+
+class QuickDrawDataset(Dataset):
+    def __init__(self, X, y):
+        self.X = X
+        self.y = y
+
+    def __len__(self):
+        return len(self.X)
+
+    def __getitem__(self, idx):
+        x = torch.tesnor(
+            self.X[idx],
+            dtype=torch.float32
+        ).respape(1, 28, 28)  
+        
+        y = torch.tensor(
+            self.y[idx],
+            dtype=torch.long
+        )
+        return x, y
 
 class Model(nn.Module):
     def __init__(self):
@@ -45,4 +69,10 @@ class Model(nn.Module):
         return x
         
         
-        
+if __name__ == "__main__":
+    X_train = np.load("quickdraw_X_train.npy")        
+    y_train = np.load("quickdraw_y_train.npy")
+    
+    X_val = np.load("quickdraw_X_val.npy")
+    y_val = np.load("quickdraw_y_val.npy")
+
