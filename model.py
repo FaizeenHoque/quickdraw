@@ -79,13 +79,80 @@ if __name__ == "__main__":
     train_dataset = QuickDrawDataset(X_train, y_train)
     val_dataset = QuickDrawDataset(X_val, y_val)
     
-    train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True, num_workers=4, pin_memory=True)
-    val_loader = DataLoader(val_dataset, batch_size=128, shuffle=False, num_workers=4, pin_memory=True)
+    train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True, num_workers=0, pin_memory=True)
+    val_loader = DataLoader(val_dataset, batch_size=128, shuffle=False, num_workers=0, pin_memory=True)
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print (f"Using device: {device}")
     
     model = Model().to(device)
     
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     
+    model.train()
+    print("Starting training...")
+    
+    for epoch in range(10):
+        model.train()
+        
+        total_loss = 0
+        correct = 0
+        total = 0
+
+        for batch_idx, (X, y) in enumerate(train_loader):
+            X, y = X.to(device), y.to(device)
+            
+            optimizer.zero_grad()
+            outputs = model(X)
+            loss = criterion(outputs, y)
+            loss.backward()
+            optimizer.step()
+            
+            total_loss += loss.item()
+            predictions = outputs.argmax(dim=1)
+            correct += (predictions == y).sum().item()
+            total += y.size(0)
+
+            if batch_idx % 100 == 0:
+                predictions = outputs.argmax(dim=1)
+                accuracy = (predictions == y).float().mean()
+
+                print(
+                    f"Epoch {epoch + 1} "
+                    f"Batch {batch_idx + 1}/{len(train_loader)} "
+                    f"Loss: {loss.item():.4f} "
+                    f"Accuracy: {accuracy.item() * 100:.2f}%",
+                    end="\r",
+                    flush=True
+                )
+                
+        epoch_loss = total_loss / len(train_loader)
+        epoch_accuracy = correct / total * 100
+        
+        print(
+            f"Epoch {epoch + 1}/10 "
+            f"Loss: {epoch_loss:.4f} "
+            f"Accuracy: {epoch_accuracy:.2f}%"
+        )
+        
+        model.eval()
+        
+        val_correct = 0
+        val_total = 0
+        
+        with torch.no_grad():
+            for X_val, y_val in val_loader:
+                X_val, y_val = X_val.to(device), y_val.to(device)
+                outputs = model(X_val)
+                predictions = outputs.argmax(dim=1)
+                val_correct += (predictions == y_val).sum().item()
+                val_total += y_val.size(0)
+        
+        val_accuracy = val_correct / val_total * 100
+        print(f"Validation Accuracy: {val_accuracy:.2f}%")
+        
+        
+            
+        
 
