@@ -40,13 +40,19 @@ class Model(nn.Module):
         
         self.conv1 = nn.Conv2d(
             in_channels=1,
-            out_channels=8,
+            out_channels=32,
             kernel_size=3,
             padding=1
         )
         self.conv2 = nn.Conv2d(
-            in_channels=8,
-            out_channels=16,
+            in_channels=32,
+            out_channels=64,
+            kernel_size=3,
+            padding=1
+        )
+        self.conv3 = nn.Conv2d(
+            in_channels=64,
+            out_channels=128,
             kernel_size=3,
             padding=1
         )
@@ -55,11 +61,11 @@ class Model(nn.Module):
             stride=2
         )
         self.fc1 = nn.Linear(
-            in_features=16 * 7 * 7,
-            out_features=128
+            in_features=128 * 3 * 3,
+            out_features=768
         )
         self.fc2 = nn.Linear(
-            in_features=128,
+            in_features=768,
             out_features=344
         )
     
@@ -69,6 +75,10 @@ class Model(nn.Module):
         x = self.pool(x)
         
         x = self.conv2(x)
+        x = nn.functional.relu(x)
+        x = self.pool(x)
+        
+        x = self.conv3(x)
         x = nn.functional.relu(x)
         x = self.pool(x)
         
@@ -83,8 +93,8 @@ if __name__ == "__main__":
     import torch.multiprocessing as mp
     mp.set_start_method("fork", force=True)
 
-    train_dataset = QuickDrawDataset("quickdraw_X_train.npy", "quickdraw_y_train.npy")
-    val_dataset = QuickDrawDataset("quickdraw_X_val.npy", "quickdraw_y_val.npy")
+    train_dataset = QuickDrawDataset("dataset/quickdraw_X_train.npy", "dataset/quickdraw_y_train.npy")
+    val_dataset = QuickDrawDataset("dataset/quickdraw_X_val.npy", "dataset/quickdraw_y_val.npy")
     
     train_loader = DataLoader(train_dataset, batch_size=1024, shuffle=True, num_workers=4, pin_memory=True, collate_fn=collate_fn)
     val_loader = DataLoader(val_dataset, batch_size=1024, shuffle=False, num_workers=4, pin_memory=True, collate_fn=collate_fn)
@@ -103,7 +113,7 @@ if __name__ == "__main__":
     )
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.00005)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.000001)
     scheduler = torch.optim.lr_scheduler.StepLR(
         optimizer,
         step_size=10,
@@ -113,7 +123,7 @@ if __name__ == "__main__":
     model.train()
     print("Starting training...")
     
-    best_val_accuracy = 0.0
+    best_val_accuracy = 71.06
     for epoch in range(100):
         model.train()
         
