@@ -7,3 +7,4 @@ __pycache__/
 dataset/
 *.npy
 *.pth
+!quickdraw_model.pth
